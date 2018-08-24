@@ -227,23 +227,26 @@ def _find_address_by_ip(ec2, public_ip):
             raise
 
 
-def _find_address_by_device_id(ec2, device_id, isinstance=True):
+def _find_address_by_device_id(ec2, device_id, private_ip_address=None, isinstance=True):
     if isinstance:
         addresses = ec2.get_all_addresses(None, {'instance-id': device_id})
+    elif private_ip_address:
+        addresses = ec2.get_all_addresses(None, {'network-interface-id': device_id, 'private-ip-address': private_ip_address})
     else:
         addresses = ec2.get_all_addresses(None, {'network-interface-id': device_id})
+
     if addresses:
         return addresses[0]
 
 
-def find_address(ec2, public_ip, device_id, isinstance=True):
+def find_address(ec2, public_ip, device_id, private_ip_address, isinstance=True):
     """ Find an existing Elastic IP address """
     if public_ip:
         return _find_address_by_ip(ec2, public_ip)
     elif device_id and isinstance:
         return _find_address_by_device_id(ec2, device_id)
     elif device_id:
-        return _find_address_by_device_id(ec2, device_id, isinstance=False)
+        return _find_address_by_device_id(ec2, device_id, private_ip_address, isinstance=False)
 
 
 def address_is_associated_with_device(ec2, address, device_id, isinstance=True):
@@ -418,9 +421,9 @@ def main():
 
     try:
         if device_id:
-            address = find_address(ec2, public_ip, device_id, isinstance=is_instance)
+            address = find_address(ec2, public_ip, device_id, private_ip_address, isinstance=is_instance)
         else:
-            address = find_address(ec2, public_ip, None)
+            address = find_address(ec2, public_ip, None, None)
 
         if state == 'present':
             if device_id:
