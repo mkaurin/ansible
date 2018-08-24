@@ -218,6 +218,14 @@ def disassociate_ip_and_device(ec2, address, device_id, check_mode, isinstance=T
 
     return {'changed': True}
 
+def find_eni_by_instance_id(ec2, instance_id, private_ip_address, module):
+    if private_ip_address:
+        enis = ec2.get_all_network_interfaces(None, {'attachment.instance-id': instance_id, 'addresses.private-ip-address': private_ip_address})
+    else:
+        enis = ec2.get_all_network_interfaces(None, {'attachment.instance-id': instance_id,'attachment.device-index':0})
+    if enis == []:
+        module.fail_json(msg="No ENIs matched. Please verify accuracy of 'device_id', 'in_vpc' and 'private_ip_address (if provided)")
+    return enis[0].id
 
 def _find_address_by_ip(ec2, public_ip):
     try:
@@ -418,6 +426,11 @@ def main():
             if device_id.startswith('eni-') and not in_vpc:
                 module.fail_json(msg="If you are specifying an ENI, in_vpc must be true")
             is_instance = False
+
+    # If all three conditions match, switch to dealing with an ENI for better control
+    if device_id and is_instance and in_vpc:
+        device_id = find_eni_by_instance_id(ec2, device_id, private_ip_address, module)
+        is_instance = False
 
     try:
         if device_id:
